@@ -1,0 +1,14 @@
+import { z } from "zod";
+
+export const registerSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6).max(128),
+  full_name: z.string().min(2).max(255),
+  locale: z.string().min(2).max(50).default("uk-UA"),
+  timezone: z.string().min(2).max(50).default("Europe/Kyiv"),
+});
+
+export const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(6).max(128),
+});
