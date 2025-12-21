@@ -1,0 +1,1148 @@
+openapi: 3.0.3
+info:
+  title: FreshFridge API
+  version: 1.0.0
+  description: REST API for FreshFridge backend (Auth, Products, Fridges, Shelves, Notifications, Jobs).
+servers:
+  - url: http://localhost:3000
+tags:
+  - name: Auth
+    description: Authentication endpoints
+  - name: Products
+    description: Product management
+  - name: Fridges
+    description: Fridge management
+  - name: Shelves
+    description: Shelf management within fridges
+  - name: Notifications
+    description: User notifications
+  - name: Jobs
+    description: Background job triggers
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+
+    # Auth schemas
+    RegisterRequest:
+      type: object
+      required: [email, password, full_name, locale, timezone]
+      properties:
+        email:
+          type: string
+          format: email
+          example: anna@test.com
+        password:
+          type: string
+          minLength: 6
+          example: password123
+        full_name:
+          type: string
+          example: Anna Test
+        locale:
+          type: string
+          example: uk-UA
+        timezone:
+          type: string
+          example: Europe/Kyiv
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: anna@test.com
+        password:
+          type: string
+          example: password123
+
+    AuthResponse:
+      type: object
+      properties:
+        user:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+            full_name:
+              type: string
+            locale:
+              type: string
+            timezone:
+              type: string
+            is_active:
+              type: boolean
+            created_at:
+              type: string
+              format: date-time
+        accessToken:
+          type: string
+
+    # Product schemas
+    ProductCreate:
+      type: object
+      required: [category_id, name, status]
+      properties:
+        fridge_id:
+          type: string
+          format: uuid
+          nullable: true
+        shelf_id:
+          type: string
+          format: uuid
+          nullable: true
+        category_id:
+          type: string
+          format: uuid
+          example: 9AAEC0A6-DB5F-4CDC-8589-185D12F9E159
+        name:
+          type: string
+          example: Milk 2.5%
+        quantity:
+          type: number
+          nullable: true
+          example: 1
+        unit:
+          type: string
+          nullable: true
+          example: l
+        purchase_date:
+          type: string
+          format: date
+          nullable: true
+          example: "2025-12-17"
+        expiration_date:
+          type: string
+          format: date
+          nullable: true
+          example: "2025-12-20"
+        status:
+          type: string
+          enum: [active, consumed, expired, removed]
+          default: active
+        notes:
+          type: string
+          nullable: true
+          example: Keep on top shelf
+
+    ProductUpdate:
+      type: object
+      properties:
+        fridge_id:
+          type: string
+          format: uuid
+          nullable: true
+        shelf_id:
+          type: string
+          format: uuid
+          nullable: true
+        category_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        quantity:
+          type: number
+          nullable: true
+        unit:
+          type: string
+          nullable: true
+        purchase_date:
+          type: string
+          format: date
+          nullable: true
+        expiration_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+          enum: [active, consumed, expired, removed]
+        notes:
+          type: string
+          nullable: true
+
+    ProductResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        fridge_id:
+          type: string
+          format: uuid
+          nullable: true
+        shelf_id:
+          type: string
+          format: uuid
+          nullable: true
+        category_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        quantity:
+          type: number
+          nullable: true
+        unit:
+          type: string
+          nullable: true
+        purchase_date:
+          type: string
+          format: date
+          nullable: true
+        expiration_date:
+          type: string
+          format: date
+          nullable: true
+        status:
+          type: string
+        notes:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    ProductListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductResponse'
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+
+    # Fridge schemas
+    FridgeCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Main Fridge
+        description:
+          type: string
+          nullable: true
+          example: Kitchen refrigerator
+
+    FridgeUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+
+    FridgeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        is_deleted:
+          type: boolean
+
+    # Shelf schemas
+    ShelfCreate:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Top Shelf
+        position:
+          type: integer
+          nullable: true
+          example: 1
+
+    ShelfUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        position:
+          type: integer
+          nullable: true
+
+    ShelfResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        fridge_id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        position:
+          type: integer
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        is_deleted:
+          type: boolean
+
+    # Notification schemas
+    NotificationCreate:
+      type: object
+      required: [type, title, message]
+      properties:
+        type:
+          type: string
+          example: EXPIRING_SOON
+        title:
+          type: string
+          example: Product expiring soon
+        message:
+          type: string
+          example: Your product "Milk" will expire in 2 days
+        related_entity_type:
+          type: string
+          nullable: true
+          example: PRODUCT
+        related_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        severity:
+          type: string
+          enum: [INFO, WARN, CRITICAL]
+          default: INFO
+
+    NotificationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+        type:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        related_entity_type:
+          type: string
+          nullable: true
+        related_entity_id:
+          type: string
+          format: uuid
+          nullable: true
+        severity:
+          type: string
+        is_read:
+          type: boolean
+        read_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        is_deleted:
+          type: boolean
+
+    MarkAllReadResponse:
+      type: object
+      properties:
+        updated:
+          type: integer
+          example: 5
+
+    # Job schemas
+    JobRunResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        stats:
+          type: object
+          properties:
+            checked:
+              type: integer
+            created:
+              type: integer
+        message:
+          type: string
+
+paths:
+  # Auth endpoints
+  /api/auth/register:
+    post:
+      tags: [Auth]
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        "201":
+          description: User registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "409":
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /api/auth/login:
+    post:
+      tags: [Auth]
+      summary: Login user and return JWT
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Product endpoints
+  /api/products:
+    get:
+      tags: [Products]
+      summary: Get products (paginated and filtered)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: status
+          schema:
+            type: string
+          description: Filter by status
+        - in: query
+          name: fridgeId
+          schema:
+            type: string
+            format: uuid
+          description: Filter by fridge
+        - in: query
+          name: shelfId
+          schema:
+            type: string
+            format: uuid
+          description: Filter by shelf
+        - in: query
+          name: categoryId
+          schema:
+            type: string
+            format: uuid
+          description: Filter by category
+        - in: query
+          name: q
+          schema:
+            type: string
+          description: Search in name or notes
+        - in: query
+          name: page
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - in: query
+          name: sort
+          schema:
+            type: string
+            enum: [created_at, expiration_date, name]
+            default: created_at
+        - in: query
+          name: order
+          schema:
+            type: string
+            enum: [asc, desc]
+            default: desc
+      responses:
+        "200":
+          description: Products retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductListResponse'
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+    post:
+      tags: [Products]
+      summary: Create product
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreate'
+      responses:
+        "201":
+          description: Product created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        "400":
+          description: Validation error or invalid fridge/shelf
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Fridge/shelf does not belong to user
+
+  /api/products/expiring:
+    get:
+      tags: [Products]
+      summary: Get products expiring within N days
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: days
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 60
+            default: 3
+          description: Number of days threshold
+      responses:
+        "200":
+          description: Expiring products retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ProductResponse'
+        "401":
+          description: Unauthorized
+
+  /api/products/{id}:
+    get:
+      tags: [Products]
+      summary: Get product by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Product retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Product does not belong to user
+        "404":
+          description: Product not found
+
+    patch:
+      tags: [Products]
+      summary: Update product
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpdate'
+      responses:
+        "200":
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductResponse'
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Product does not belong to user
+        "404":
+          description: Product not found
+
+    delete:
+      tags: [Products]
+      summary: Delete product
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Product deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Product does not belong to user
+        "404":
+          description: Product not found
+
+  # Fridge endpoints
+  /api/fridges:
+    get:
+      tags: [Fridges]
+      summary: Get user's fridges
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Fridges retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FridgeResponse'
+        "401":
+          description: Unauthorized
+
+    post:
+      tags: [Fridges]
+      summary: Create fridge
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FridgeCreate'
+      responses:
+        "201":
+          description: Fridge created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FridgeResponse'
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+
+  /api/fridges/{id}:
+    get:
+      tags: [Fridges]
+      summary: Get fridge by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Fridge retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FridgeResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Fridge does not belong to user
+        "404":
+          description: Fridge not found
+
+    put:
+      tags: [Fridges]
+      summary: Update fridge
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FridgeUpdate'
+      responses:
+        "200":
+          description: Fridge updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FridgeResponse'
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Fridge does not belong to user
+        "404":
+          description: Fridge not found
+
+    delete:
+      tags: [Fridges]
+      summary: Delete fridge
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Fridge deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Fridge does not belong to user
+        "404":
+          description: Fridge not found
+        "409":
+          description: Cannot delete fridge with shelves or products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Shelf endpoints
+  /api/fridges/{fridgeId}/shelves:
+    get:
+      tags: [Shelves]
+      summary: Get shelves in fridge
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: fridgeId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Shelves retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ShelfResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Fridge does not belong to user
+        "404":
+          description: Fridge not found
+
+    post:
+      tags: [Shelves]
+      summary: Create shelf in fridge
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: fridgeId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShelfCreate'
+      responses:
+        "201":
+          description: Shelf created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShelfResponse'
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Fridge does not belong to user
+        "404":
+          description: Fridge not found
+
+  /api/shelves/{id}:
+    get:
+      tags: [Shelves]
+      summary: Get shelf by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Shelf retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShelfResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Shelf does not belong to user
+        "404":
+          description: Shelf not found
+
+    put:
+      tags: [Shelves]
+      summary: Update shelf
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ShelfUpdate'
+      responses:
+        "200":
+          description: Shelf updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ShelfResponse'
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+        "403":
+          description: Shelf does not belong to user
+        "404":
+          description: Shelf not found
+
+    delete:
+      tags: [Shelves]
+      summary: Delete shelf
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Shelf deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Shelf does not belong to user
+        "404":
+          description: Shelf not found
+        "409":
+          description: Cannot delete shelf with products
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  # Notification endpoints
+  /api/notifications:
+    get:
+      tags: [Notifications]
+      summary: Get notifications (filtered, paginated)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: isRead
+          schema:
+            type: string
+            enum: ["true", "false"]
+          description: Filter by read status
+        - in: query
+          name: type
+          schema:
+            type: string
+          description: Filter by notification type
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Notifications retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationResponse'
+        "401":
+          description: Unauthorized
+
+    post:
+      tags: [Notifications]
+      summary: Create notification (for testing/admin)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationCreate'
+      responses:
+        "201":
+          description: Notification created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+        "400":
+          description: Validation error
+        "401":
+          description: Unauthorized
+
+  /api/notifications/{id}:
+    get:
+      tags: [Notifications]
+      summary: Get notification by ID
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Notification retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Notification does not belong to user
+        "404":
+          description: Notification not found
+
+    delete:
+      tags: [Notifications]
+      summary: Delete notification
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "204":
+          description: Notification deleted
+        "401":
+          description: Unauthorized
+        "403":
+          description: Notification does not belong to user
+        "404":
+          description: Notification not found
+
+  /api/notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Mark notification as read
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Notification marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Notification does not belong to user
+        "404":
+          description: Notification not found
+
+  /api/notifications/read-all:
+    patch:
+      tags: [Notifications]
+      summary: Mark all notifications as read
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: All notifications marked as read
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkAllReadResponse'
+        "401":
+          description: Unauthorized
+
+  # Job endpoints
+  /api/jobs/freshness/run:
+    post:
+      tags: [Jobs]
+      summary: Manually trigger freshness check job
+      description: Triggers immediate product expiration check and notification creation
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Job executed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobRunResponse'
+        "401":
+          description: Unauthorized
