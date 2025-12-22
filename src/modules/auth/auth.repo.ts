@@ -8,6 +8,9 @@ export type UserRow = {
   locale: string;
   timezone: string;
   is_active: boolean;
+  role: string;
+  is_blocked: boolean;
+  blocked_at: Date | null;
   created_at: Date;
 };
 

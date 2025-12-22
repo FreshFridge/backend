@@ -26,7 +26,7 @@ export class AuthService {
       timezone: dto.timezone,
     });
 
-    const accessToken = this.signAccessToken(user.id, user.email);
+    const accessToken = this.signAccessToken(user.id, user.email, "user");
     return { user, accessToken };
   }
 
@@ -34,11 +34,12 @@ export class AuthService {
     const user = await this.repo.findByEmail(dto.email);
     if (!user) throw new UnauthorizedError("Invalid credentials");
     if (!user.is_active) throw new UnauthorizedError("User is inactive");
+    if (user.is_blocked) throw new UnauthorizedError("User is blocked");
 
     const ok = await bcrypt.compare(dto.password, user.password_hash);
     if (!ok) throw new UnauthorizedError("Invalid credentials");
 
-    const accessToken = this.signAccessToken(user.id, user.email);
+    const accessToken = this.signAccessToken(user.id, user.email, user.role);
     return {
       user: {
         id: user.id,
@@ -47,16 +48,17 @@ export class AuthService {
         locale: user.locale,
         timezone: user.timezone,
         is_active: user.is_active,
+        role: user.role,
         created_at: user.created_at,
       },
       accessToken,
     };
   }
 
-  private signAccessToken(id: string, email: string) {
+  private signAccessToken(id: string, email: string, role: string) {
     const secret = process.env.JWT_ACCESS_SECRET as jwt.Secret;
     const expiresIn = (process.env.JWT_ACCESS_EXPIRES_IN ?? "15m") as jwt.SignOptions["expiresIn"];
 
-    return jwt.sign({ id, email }, secret, { expiresIn });
+    return jwt.sign({ id, email, role }, secret, { expiresIn });
   }
 }

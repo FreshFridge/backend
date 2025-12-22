@@ -18,6 +18,10 @@ tags:
     description: User notifications
   - name: Jobs
     description: Background job triggers
+  - name: IoT
+    description: IoT telemetry data ingestion and retrieval
+  - name: Admin
+    description: Admin endpoints (RBAC, user management, system settings, audit log)
 
 components:
   securitySchemes:
@@ -414,6 +418,203 @@ components:
               type: integer
         message:
           type: string
+
+    # Telemetry (IoT) schemas
+    TelemetryCreateRequest:
+      type: object
+      required: [fridge_id, temperature, door_open]
+      properties:
+        fridge_id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        temperature:
+          type: number
+          minimum: -50
+          maximum: 100
+          example: 4.5
+        humidity:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+          example: 65.2
+        door_open:
+          type: boolean
+          example: false
+
+    TelemetryRecord:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        fridge_id:
+          type: string
+          format: uuid
+        temperature:
+          type: number
+        humidity:
+          type: number
+          nullable: true
+        door_open:
+          type: boolean
+        recorded_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+
+    # Admin schemas
+    AdminUser:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        full_name:
+          type: string
+        locale:
+          type: string
+        timezone:
+          type: string
+        is_active:
+          type: boolean
+        role:
+          type: string
+          enum: [user, admin]
+        is_blocked:
+          type: boolean
+        blocked_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AdminUsersList:
+      type: object
+      properties:
+        users:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminUser'
+        total:
+          type: integer
+
+    UpdateUserRoleRequest:
+      type: object
+      required: [role]
+      properties:
+        role:
+          type: string
+          enum: [user, admin]
+
+    UpdateUserBlockStatusRequest:
+      type: object
+      required: [is_blocked]
+      properties:
+        is_blocked:
+          type: boolean
+
+    SystemSettings:
+      type: object
+      properties:
+        system:
+          type: object
+          properties:
+            expiring_soon_days:
+              type: integer
+            notification_cooldown_hours:
+              type: integer
+        telemetry:
+          type: object
+          properties:
+            min_temperature:
+              type: number
+            max_temperature:
+              type: number
+            min_humidity:
+              type: number
+              nullable: true
+            max_humidity:
+              type: number
+              nullable: true
+            max_door_open_seconds:
+              type: integer
+
+    UpdateSystemSettingsRequest:
+      type: object
+      properties:
+        expiring_soon_days:
+          type: integer
+          minimum: 1
+          maximum: 30
+        notification_cooldown_hours:
+          type: integer
+          minimum: 1
+          maximum: 168
+        min_temperature:
+          type: number
+          minimum: -50
+          maximum: 50
+        max_temperature:
+          type: number
+          minimum: -50
+          maximum: 50
+        min_humidity:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+        max_humidity:
+          type: number
+          minimum: 0
+          maximum: 100
+          nullable: true
+        max_door_open_seconds:
+          type: integer
+          minimum: 1
+          maximum: 3600
+
+    AuditLogEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        admin_user_id:
+          type: string
+          format: uuid
+        action:
+          type: string
+        target_user_id:
+          type: string
+          format: uuid
+          nullable: true
+        details:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    AuditLogList:
+      type: object
+      properties:
+        logs:
+          type: array
+          items:
+            $ref: '#/components/schemas/AuditLogEntry'
+        total:
+          type: integer
 
 paths:
   # Auth endpoints
@@ -1146,3 +1347,338 @@ paths:
                 $ref: '#/components/schemas/JobRunResponse'
         "401":
           description: Unauthorized
+
+  # IoT Telemetry endpoints
+  /api/iot/telemetry:
+    post:
+      tags: [IoT]
+      summary: Ingest telemetry data from fridge
+      description: Accept telemetry data from IoT fridge, analyze against thresholds, and create notifications on violations
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelemetryCreateRequest'
+      responses:
+        "201":
+          description: Telemetry recorded successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelemetryRecord'
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Fridge does not belong to user
+        "404":
+          description: Fridge not found
+
+  /api/iot/telemetry/{fridgeId}:
+    get:
+      tags: [IoT]
+      summary: Get telemetry history for a fridge
+      description: Retrieve telemetry records with pagination
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: fridgeId
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 50
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        "200":
+          description: Telemetry history retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TelemetryRecord'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Fridge does not belong to user
+        "404":
+          description: Fridge not found
+
+  /api/iot/telemetry/{fridgeId}/latest:
+    get:
+      tags: [IoT]
+      summary: Get latest telemetry snapshot for a fridge
+      description: Retrieve the most recent telemetry data point for dashboard display
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: fridgeId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Latest telemetry retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TelemetryRecord'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Fridge does not belong to user
+        "404":
+          description: Fridge not found or no telemetry data available
+
+  # Admin endpoints
+  /api/admin/users:
+    get:
+      tags: [Admin]
+      summary: List all users with filters (admin only)
+      description: Retrieve paginated list of all users with optional filters
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [user, admin]
+        - in: query
+          name: is_blocked
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Users list retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUsersList'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - admin role required
+
+  /api/admin/users/{id}:
+    get:
+      tags: [Admin]
+      summary: Get user by ID (admin only)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: User retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - admin role required
+        "404":
+          description: User not found
+
+  /api/admin/users/{id}/role:
+    patch:
+      tags: [Admin]
+      summary: Update user role (admin only)
+      description: Change a user's role between 'user' and 'admin'. Creates audit log entry.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserRoleRequest'
+      responses:
+        "200":
+          description: Role updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - admin role required
+        "404":
+          description: User not found
+
+  /api/admin/users/{id}/block:
+    patch:
+      tags: [Admin]
+      summary: Block or unblock user (admin only)
+      description: Update user's blocked status. Blocked users cannot login. Creates audit log entry.
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateUserBlockStatusRequest'
+      responses:
+        "200":
+          description: Block status updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - admin role required
+        "404":
+          description: User not found
+
+  /api/admin/settings:
+    get:
+      tags: [Admin]
+      summary: Get combined system settings (admin only)
+      description: Retrieve both SystemSettings (freshness job) and TelemetryThresholds
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Settings retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemSettings'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - admin role required
+        "404":
+          description: Settings not found
+
+    patch:
+      tags: [Admin]
+      summary: Update system settings (admin only)
+      description: Update SystemSettings and/or TelemetryThresholds. Creates audit log entry.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSystemSettingsRequest'
+      responses:
+        "200":
+          description: Settings updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SystemSettings'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - admin role required
+
+  /api/admin/audit:
+    get:
+      tags: [Admin]
+      summary: List audit logs with filters (admin only)
+      description: Retrieve paginated admin action audit logs
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - in: query
+          name: offset
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+        - in: query
+          name: admin_user_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: target_user_id
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: action
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Audit logs retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditLogList'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Forbidden - admin role required
