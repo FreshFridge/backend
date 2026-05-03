@@ -1,4 +1,5 @@
 import { ForbiddenError, NotFoundError } from "../../../utils/errors";
+import { logger } from "../../../utils/logger";
 import { FridgesRepository } from "../../fridges/fridges.repo";
 import { NotificationsRepository } from "../../notifications/notifications.repo";
 import { TelemetryRepository } from "./telemetry.repo";
@@ -63,7 +64,7 @@ export class TelemetryService {
   ): Promise<void> {
     const threshold = await this.repo.getActiveThreshold();
     if (!threshold) {
-      console.warn("[Telemetry] No active threshold configured");
+      logger.warn("No active telemetry threshold configured");
       return;
     }
 

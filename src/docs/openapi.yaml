@@ -4,7 +4,7 @@ info:
   version: 1.0.0
   description: REST API for FreshFridge backend (Auth, Products, Fridges, Shelves, Notifications, Jobs).
 servers:
-  - url: http://localhost:3000
+  - url: /
 tags:
   - name: Auth
     description: Authentication endpoints
@@ -40,7 +40,7 @@ components:
     # Auth schemas
     RegisterRequest:
       type: object
-      required: [email, password, full_name, locale, timezone]
+      required: [email, password, fullName, locale, timezone]
       properties:
         email:
           type: string
@@ -50,7 +50,7 @@ components:
           type: string
           minLength: 6
           example: password123
-        full_name:
+        fullName:
           type: string
           example: Anna Test
         locale:
@@ -83,15 +83,15 @@ components:
               format: uuid
             email:
               type: string
-            full_name:
+            fullName:
               type: string
             locale:
               type: string
             timezone:
               type: string
-            is_active:
+            isActive:
               type: boolean
-            created_at:
+            createdAt:
               type: string
               format: date-time
         accessToken:
@@ -100,17 +100,17 @@ components:
     # Product schemas
     ProductCreate:
       type: object
-      required: [category_id, name, status]
+      required: [categoryId, name, status]
       properties:
-        fridge_id:
+        fridgeId:
           type: string
           format: uuid
           nullable: true
-        shelf_id:
+        shelfId:
           type: string
           format: uuid
           nullable: true
-        category_id:
+        categoryId:
           type: string
           format: uuid
           example: 9AAEC0A6-DB5F-4CDC-8589-185D12F9E159
@@ -125,12 +125,12 @@ components:
           type: string
           nullable: true
           example: l
-        purchase_date:
+        purchaseDate:
           type: string
           format: date
           nullable: true
           example: "2025-12-17"
-        expiration_date:
+        expirationDate:
           type: string
           format: date
           nullable: true
@@ -147,15 +147,15 @@ components:
     ProductUpdate:
       type: object
       properties:
-        fridge_id:
+        fridgeId:
           type: string
           format: uuid
           nullable: true
-        shelf_id:
+        shelfId:
           type: string
           format: uuid
           nullable: true
-        category_id:
+        categoryId:
           type: string
           format: uuid
         name:
@@ -166,11 +166,11 @@ components:
         unit:
           type: string
           nullable: true
-        purchase_date:
+        purchaseDate:
           type: string
           format: date
           nullable: true
-        expiration_date:
+        expirationDate:
           type: string
           format: date
           nullable: true
@@ -187,18 +187,18 @@ components:
         id:
           type: string
           format: uuid
-        user_id:
+        userId:
           type: string
           format: uuid
-        fridge_id:
-          type: string
-          format: uuid
-          nullable: true
-        shelf_id:
+        fridgeId:
           type: string
           format: uuid
           nullable: true
-        category_id:
+        shelfId:
+          type: string
+          format: uuid
+          nullable: true
+        categoryId:
           type: string
           format: uuid
         name:
@@ -209,11 +209,11 @@ components:
         unit:
           type: string
           nullable: true
-        purchase_date:
+        purchaseDate:
           type: string
           format: date
           nullable: true
-        expiration_date:
+        expirationDate:
           type: string
           format: date
           nullable: true
@@ -222,7 +222,7 @@ components:
         notes:
           type: string
           nullable: true
-        created_at:
+        createdAt:
           type: string
           format: date-time
 
@@ -268,7 +268,7 @@ components:
         id:
           type: string
           format: uuid
-        user_id:
+        userId:
           type: string
           format: uuid
         name:
@@ -276,13 +276,13 @@ components:
         description:
           type: string
           nullable: true
-        created_at:
+        createdAt:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
-        is_deleted:
+        isDeleted:
           type: boolean
 
     # Shelf schemas
@@ -313,7 +313,7 @@ components:
         id:
           type: string
           format: uuid
-        fridge_id:
+        fridgeId:
           type: string
           format: uuid
         name:
@@ -321,13 +321,13 @@ components:
         position:
           type: integer
           nullable: true
-        created_at:
+        createdAt:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
-        is_deleted:
+        isDeleted:
           type: boolean
 
     # Notification schemas
@@ -344,11 +344,11 @@ components:
         message:
           type: string
           example: Your product "Milk" will expire in 2 days
-        related_entity_type:
+        relatedEntityType:
           type: string
           nullable: true
           example: PRODUCT
-        related_entity_id:
+        relatedEntityId:
           type: string
           format: uuid
           nullable: true
@@ -363,7 +363,7 @@ components:
         id:
           type: string
           format: uuid
-        user_id:
+        userId:
           type: string
           format: uuid
         type:
@@ -372,28 +372,28 @@ components:
           type: string
         message:
           type: string
-        related_entity_type:
+        relatedEntityType:
           type: string
           nullable: true
-        related_entity_id:
+        relatedEntityId:
           type: string
           format: uuid
           nullable: true
         severity:
           type: string
-        is_read:
+        isRead:
           type: boolean
-        read_at:
+        readAt:
           type: string
           format: date-time
           nullable: true
-        created_at:
+        createdAt:
           type: string
           format: date-time
         updated_at:
           type: string
           format: date-time
-        is_deleted:
+        isDeleted:
           type: boolean
 
     MarkAllReadResponse:
@@ -422,9 +422,9 @@ components:
     # Telemetry (IoT) schemas
     TelemetryCreateRequest:
       type: object
-      required: [fridge_id, temperature, door_open]
+      required: [fridgeId, temperature, doorOpen]
       properties:
-        fridge_id:
+        fridgeId:
           type: string
           format: uuid
           example: 550e8400-e29b-41d4-a716-446655440000
@@ -439,7 +439,7 @@ components:
           maximum: 100
           nullable: true
           example: 65.2
-        door_open:
+        doorOpen:
           type: boolean
           example: false
 
@@ -449,7 +449,7 @@ components:
         id:
           type: string
           format: uuid
-        fridge_id:
+        fridgeId:
           type: string
           format: uuid
         temperature:
@@ -457,12 +457,12 @@ components:
         humidity:
           type: number
           nullable: true
-        door_open:
+        doorOpen:
           type: boolean
-        recorded_at:
+        recordedAt:
           type: string
           format: date-time
-        created_at:
+        createdAt:
           type: string
           format: date-time
 
@@ -475,24 +475,24 @@ components:
           format: uuid
         email:
           type: string
-        full_name:
+        fullName:
           type: string
         locale:
           type: string
         timezone:
           type: string
-        is_active:
+        isActive:
           type: boolean
         role:
           type: string
           enum: [user, admin]
-        is_blocked:
+        isBlocked:
           type: boolean
-        blocked_at:
+        blockedAt:
           type: string
           format: date-time
           nullable: true
-        created_at:
+        createdAt:
           type: string
           format: date-time
         updated_at:
@@ -519,9 +519,9 @@ components:
 
     UpdateUserBlockStatusRequest:
       type: object
-      required: [is_blocked]
+      required: [isBlocked]
       properties:
-        is_blocked:
+        isBlocked:
           type: boolean
 
     SystemSettings:
@@ -530,56 +530,56 @@ components:
         system:
           type: object
           properties:
-            expiring_soon_days:
+            expiringSoonDays:
               type: integer
-            notification_cooldown_hours:
+            notificationCooldownHours:
               type: integer
         telemetry:
           type: object
           properties:
-            min_temperature:
+            minTemperature:
               type: number
-            max_temperature:
+            maxTemperature:
               type: number
-            min_humidity:
-              type: number
-              nullable: true
-            max_humidity:
+            minHumidity:
               type: number
               nullable: true
-            max_door_open_seconds:
+            maxHumidity:
+              type: number
+              nullable: true
+            max_doorOpen_seconds:
               type: integer
 
     UpdateSystemSettingsRequest:
       type: object
       properties:
-        expiring_soon_days:
+        expiringSoonDays:
           type: integer
           minimum: 1
           maximum: 30
-        notification_cooldown_hours:
+        notificationCooldownHours:
           type: integer
           minimum: 1
           maximum: 168
-        min_temperature:
+        minTemperature:
           type: number
           minimum: -50
           maximum: 50
-        max_temperature:
+        maxTemperature:
           type: number
           minimum: -50
           maximum: 50
-        min_humidity:
+        minHumidity:
           type: number
           minimum: 0
           maximum: 100
           nullable: true
-        max_humidity:
+        maxHumidity:
           type: number
           minimum: 0
           maximum: 100
           nullable: true
-        max_door_open_seconds:
+        max_doorOpen_seconds:
           type: integer
           minimum: 1
           maximum: 3600
@@ -590,19 +590,19 @@ components:
         id:
           type: string
           format: uuid
-        admin_user_id:
+        admin_userId:
           type: string
           format: uuid
         action:
           type: string
-        target_user_id:
+        target_userId:
           type: string
           format: uuid
           nullable: true
         details:
           type: string
           nullable: true
-        created_at:
+        createdAt:
           type: string
           format: date-time
 
@@ -725,8 +725,8 @@ paths:
           name: sort
           schema:
             type: string
-            enum: [created_at, expiration_date, name]
-            default: created_at
+            enum: [createdAt, expirationDate, name]
+            default: createdAt
         - in: query
           name: order
           schema:
@@ -1481,7 +1481,7 @@ paths:
             type: string
             enum: [user, admin]
         - in: query
-          name: is_blocked
+          name: isBlocked
           schema:
             type: boolean
       responses:
@@ -1658,12 +1658,12 @@ paths:
             minimum: 0
             default: 0
         - in: query
-          name: admin_user_id
+          name: admin_userId
           schema:
             type: string
             format: uuid
         - in: query
-          name: target_user_id
+          name: target_userId
           schema:
             type: string
             format: uuid
@@ -1682,3 +1682,4 @@ paths:
           description: Unauthorized
         "403":
           description: Forbidden - admin role required
+

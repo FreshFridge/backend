@@ -52,18 +52,19 @@ export class AdminRepository {
   }): Promise<{ users: UserRow[]; total: number }> {
     const pool = await poolPromise;
     const req = pool.request();
+    const countReq = pool.request();
 
     let whereClause = "1 = 1";
-    const params: any = {};
-
     if (filters.role) {
       whereClause += " AND role = @role";
       req.input("role", sql.NVarChar(20), filters.role);
+      countReq.input("role", sql.NVarChar(20), filters.role);
     }
 
     if (filters.is_blocked !== undefined) {
       whereClause += " AND is_blocked = @is_blocked";
       req.input("is_blocked", sql.Bit, filters.is_blocked);
+      countReq.input("is_blocked", sql.Bit, filters.is_blocked);
     }
 
     req.input("limit", sql.Int, filters.limit);
@@ -77,11 +78,7 @@ export class AdminRepository {
         ORDER BY created_at DESC
         OFFSET @offset ROWS FETCH NEXT @limit ROWS ONLY
       `),
-      pool
-        .request()
-        .input("role", sql.NVarChar(20), filters.role)
-        .input("is_blocked", sql.Bit, filters.is_blocked)
-        .query(`SELECT COUNT(*) as total FROM Users WHERE ${whereClause}`),
+      countReq.query(`SELECT COUNT(*) as total FROM Users WHERE ${whereClause}`),
     ]);
 
     return {

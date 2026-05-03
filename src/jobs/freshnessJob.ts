@@ -1,4 +1,5 @@
 import { poolPromise, sql } from "../db/mssql";
+import { logger } from "../utils/logger";
 
 type ProductForCheck = {
   id: string;
@@ -17,7 +18,7 @@ export class FreshnessJob {
 
   async run(): Promise<{ checked: number; created: number }> {
     if (this.isRunning) {
-      console.log("[FreshnessJob] Already running, skipping...");
+      logger.info("Freshness job already running, skipping");
       return { checked: 0, created: 0 };
     }
 
@@ -25,7 +26,7 @@ export class FreshnessJob {
     const startTime = Date.now();
 
     try {
-      console.log("[FreshnessJob] Starting freshness check...");
+      logger.info("Starting freshness check");
 
       const expiringThresholdDays = parseInt(process.env.EXPIRING_SOON_DAYS ?? "2", 10);
       const cooldownHours = parseInt(process.env.NOTIFICATION_COOLDOWN_HOURS ?? "24", 10);
@@ -83,13 +84,15 @@ export class FreshnessJob {
       }
 
       const duration = Date.now() - startTime;
-      console.log(
-        `[FreshnessJob] Completed in ${duration}ms. Checked ${products.length} products, created ${notificationsCreated} notifications.`
-      );
+      logger.info("Freshness check completed", {
+        durationMs: duration,
+        checked: products.length,
+        created: notificationsCreated,
+      });
 
       return { checked: products.length, created: notificationsCreated };
     } catch (error) {
-      console.error("[FreshnessJob] Error:", error);
+      logger.error("Freshness job failed", { error: error instanceof Error ? error.message : String(error) });
       return { checked: 0, created: 0 };
     } finally {
       this.isRunning = false;

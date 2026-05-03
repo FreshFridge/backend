@@ -23,7 +23,7 @@ export const listProductsQuerySchema = z.object({
   q: z.string().optional(),
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
-  sort: z.enum(["created_at", "expiration_date", "name"]).default("created_at"),
+  sort: z.enum(["createdAt", "expirationDate", "created_at", "expiration_date", "name"]).default("createdAt"),
   order: z.enum(["asc", "desc"]).default("desc"),
 });
 

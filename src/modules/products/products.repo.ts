@@ -88,7 +88,14 @@ export class ProductsRepository {
 
     const whereSql = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
 
-    const sortField = ["created_at", "expiration_date", "name"].includes(query.sort) ? query.sort : "created_at";
+    const sortFields: Record<string, string> = {
+      createdAt: "created_at",
+      created_at: "created_at",
+      expirationDate: "expiration_date",
+      expiration_date: "expiration_date",
+      name: "name",
+    };
+    const sortField = sortFields[query.sort] ?? "created_at";
     const sortOrder = query.order === "asc" ? "ASC" : "DESC";
 
     const offset = (query.page - 1) * query.limit;
