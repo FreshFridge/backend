@@ -1,10 +1,13 @@
 #include <WiFi.h>
+#include <WiFiClient.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <DHTesp.h>
+#include <math.h>
 
-static const int DHT_PIN = 15;   
-static const int DOOR_PIN = 4;  
+static const int DHT_PIN = 15;
+static const int DOOR_PIN = 4;
 static const int SERIAL_BAUD = 115200;
 
 static const char* WIFI_SSID = "Wokwi-GUEST";
@@ -16,193 +19,203 @@ static const char* TELEMETRY_PATH = "/api/iot/telemetry";
 
 static const char* FRIDGE_ID = "AD5501E3-6EFB-4AF6-88B7-C2363EE753C7";
 
-static const unsigned long READ_INTERVAL_MS = 5000; 
-static const float H_MIN = 35.0f;
-static const float H_MAX = 70.0f;
+static const unsigned long SEND_INTERVAL_MS = 5000;
+static const unsigned long WIFI_RETRY_DELAY_MS = 500;
+static const int WIFI_MAX_ATTEMPTS = 40;
+static const int HTTP_TIMEOUT_MS = 10000;
+static const int HTTP_MAX_ATTEMPTS = 3;
 
-static const unsigned long DOOR_PENALTY_WINDOW_MS = 10UL * 60UL * 1000UL; 
-static const float DOOR_K = 0.05f;  
+struct TelemetryData {
+  float temperature;
+  float humidity;
+  bool doorOpen;
+};
 
 DHTesp dht;
-unsigned long lastReadMs = 0;
+unsigned long lastSendMs = 0;
+bool lastDoorOpen = false;
 
-bool doorOpen = false;
-unsigned long doorOpenedAtMs = 0;
-unsigned long doorOpenAccumulatedMs = 0;
-unsigned long windowStartMs = 0;
-
-static float clampf(float v, float lo, float hi) {
-  if (v < lo) return lo;
-  if (v > hi) return hi;
-  return v;
+static float roundToOneDecimal(float value) {
+  return roundf(value * 10.0f) / 10.0f;
 }
 
-static bool isValidReading(float t, float h) {
-  if (isnan(t) || isnan(h)) return false;
-  if (t < -40 || t > 80) return false;
-  if (h < 0 || h > 100) return false;
+static bool isValidDhtReading(float temperature, float humidity) {
+  if (isnan(temperature) || isnan(humidity)) return false;
+  if (temperature < -40.0f || temperature > 80.0f) return false;
+  if (humidity < 0.0f || humidity > 100.0f) return false;
   return true;
 }
 
-static float computeRiskScore(float t, float h, float doorOpenSecondsInWindow) {
-  const float T_MID = 4.0f;
-  const float kT = 10.0f;
-  float tempPenalty = clampf(fabs(t - T_MID) * kT, 0.0f, 60.0f);
+static bool connectWiFi() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return true;
+  }
 
-  const float kH = 0.5f;
-  float humOut = 0.0f;
-  if (h > H_MAX) humOut = h - H_MAX;
-  else if (h < H_MIN) humOut = H_MIN - h;
-  float humPenalty = clampf(humOut * kH, 0.0f, 25.0f);
+  Serial.print("[WiFi] Connecting to ");
+  Serial.println(WIFI_SSID);
 
-  float doorPenalty = clampf(doorOpenSecondsInWindow * DOOR_K, 0.0f, 15.0f);
-
-  return clampf(tempPenalty + humPenalty + doorPenalty, 0.0f, 100.0f);
-}
-
-static void printTelemetry(float t, float h, bool doorOpenNow, float risk, float doorOpenSec) {
-  Serial.print("T=");
-  Serial.print(t, 1);
-  Serial.print("C  H=");
-  Serial.print(h, 1);
-  Serial.print("%  door=");
-  Serial.print(doorOpenNow ? "OPEN" : "CLOSED");
-  Serial.print("  door10m=");
-  Serial.print(doorOpenSec, 0);
-  Serial.print("s  RiskScore=");
-  Serial.println(risk, 0);
-}
-
-static void wifiConnect() {
   WiFi.mode(WIFI_STA);
   WiFi.begin(WIFI_SSID, WIFI_PASS);
 
-  Serial.print("Connecting WiFi");
-  int tries = 0;
-  while (WiFi.status() != WL_CONNECTED && tries < 40) {
-    delay(250);
-    Serial.print(".");
-    tries++;
-  }
-  Serial.println();
+  for (int attempt = 1; attempt <= WIFI_MAX_ATTEMPTS; attempt++) {
+    if (WiFi.status() == WL_CONNECTED) {
+      Serial.print("[WiFi] Connected, IP: ");
+      Serial.println(WiFi.localIP());
+      return true;
+    }
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Serial.print("WiFi connected, IP: ");
-    Serial.println(WiFi.localIP());
-  } else {
-    Serial.println("WiFi NOT connected (will retry).");
+    Serial.print("[WiFi] Waiting... ");
+    Serial.print(attempt);
+    Serial.print("/");
+    Serial.println(WIFI_MAX_ATTEMPTS);
+    delay(WIFI_RETRY_DELAY_MS);
   }
+
+  Serial.print("[ERROR] WiFi failed, status: ");
+  Serial.println(WiFi.status());
+  return false;
 }
 
-static int postTelemetryToServer(float t, float h, bool doorOpenNow) {
-  if (WiFi.status() != WL_CONNECTED) return -1;
+static bool readSensors(TelemetryData& data) {
+  TempAndHumidity reading = dht.getTempAndHumidity();
 
-  HTTPClient http;
-  String url = String(BASE_URL) + TELEMETRY_PATH;
+  if (!isValidDhtReading(reading.temperature, reading.humidity)) {
+    Serial.println("[ERROR] DHT22 returned invalid data, telemetry skipped");
+    return false;
+  }
 
+  data.temperature = roundToOneDecimal(reading.temperature);
+  data.humidity = roundToOneDecimal(reading.humidity);
+
+  // With INPUT_PULLUP the active switch state is LOW.
+  data.doorOpen = digitalRead(DOOR_PIN) == LOW;
+
+  if (data.doorOpen != lastDoorOpen) {
+    Serial.print("[Door] State changed: ");
+    Serial.println(data.doorOpen ? "OPEN" : "CLOSED");
+    lastDoorOpen = data.doorOpen;
+  }
+
+  Serial.print("[Sensor] T=");
+  Serial.print(data.temperature, 1);
+  Serial.print("C H=");
+  Serial.print(data.humidity, 1);
+  Serial.print("% Door=");
+  Serial.println(data.doorOpen ? "OPEN" : "CLOSED");
+
+  return true;
+}
+
+static String buildTelemetryBody(const TelemetryData& data) {
   StaticJsonDocument<256> doc;
   doc["fridge_id"] = FRIDGE_ID;
-  doc["temperature"] = t;
-  doc["humidity"] = h;
-  doc["door_open"] = doorOpenNow;
+  doc["temperature"] = data.temperature;
+  doc["humidity"] = data.humidity;
+  doc["door_open"] = data.doorOpen;
 
   String body;
   serializeJson(doc, body);
+  return body;
+}
 
-  http.begin(url);
-  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
-  http.addHeader("Content-Type", "application/json");
+static int postTelemetryOnce(const String& url, const String& body) {
+  WiFiClientSecure client;
+  client.setInsecure();
 
-  String authHeader = String("Bearer ") + AUTH_TOKEN;
-  http.addHeader("Authorization", authHeader);
-
-  int code = http.POST(body);
-  String resp = http.getString();
-  http.end();
-
-  Serial.print("POST ");
-  Serial.print(url);
-  Serial.print(" => ");
-  Serial.println(code);
-
-  if (resp.length() > 0) {
-    Serial.print("Response: ");
-    Serial.println(resp);
+  HTTPClient http;
+  if (!http.begin(client, url)) {
+    Serial.println("[ERROR] HTTP begin failed");
+    return -1;
   }
 
-  return code;
+  http.setTimeout(HTTP_TIMEOUT_MS);
+  http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Authorization", String("Bearer ") + AUTH_TOKEN);
+
+  Serial.print("[HTTP] POST ");
+  Serial.println(url);
+  Serial.print("[HTTP] Body: ");
+  Serial.println(body);
+
+  int statusCode = http.POST(body);
+  String responseBody = http.getString();
+
+  Serial.print("[HTTP] Status: ");
+  Serial.println(statusCode);
+  Serial.print("[HTTP] Response: ");
+  Serial.println(responseBody.length() > 0 ? responseBody : "<empty>");
+
+  if (statusCode <= 0) {
+    Serial.print("[ERROR] HTTP failed: ");
+    Serial.println(http.errorToString(statusCode));
+  }
+
+  http.end();
+  return statusCode;
+}
+
+static bool sendTelemetry(const TelemetryData& data) {
+  if (!connectWiFi()) {
+    Serial.println("[ERROR] Telemetry skipped: WiFi is offline");
+    return false;
+  }
+
+  const String url = String(BASE_URL) + TELEMETRY_PATH;
+  const String body = buildTelemetryBody(data);
+
+  for (int attempt = 1; attempt <= HTTP_MAX_ATTEMPTS; attempt++) {
+    Serial.print("[HTTP] Attempt ");
+    Serial.print(attempt);
+    Serial.print("/");
+    Serial.println(HTTP_MAX_ATTEMPTS);
+
+    int statusCode = postTelemetryOnce(url, body);
+
+    if (statusCode >= 200 && statusCode < 300) {
+      Serial.println("[HTTP] OK");
+      return true;
+    }
+
+    Serial.println("[ERROR] Telemetry request was not successful");
+    if (attempt < HTTP_MAX_ATTEMPTS) {
+      delay(1000);
+    }
+  }
+
+  Serial.println("[ERROR] Telemetry failed after retries");
+  return false;
 }
 
 void setup() {
   Serial.begin(SERIAL_BAUD);
   delay(200);
 
-  pinMode(DOOR_PIN, INPUT_PULLUP); 
+  pinMode(DOOR_PIN, INPUT_PULLUP);
   dht.setup(DHT_PIN, DHTesp::DHT22);
 
-  windowStartMs = millis();
-
-  Serial.println("FreshFridge IoT client (ESP32/Wokwi) started");
-  Serial.println("Pins: DHT22=GPIO15, DoorSwitch=GPIO4 (INPUT_PULLUP)");
-  Serial.print("Server: ");
+  Serial.println("[System] FreshFridge ESP32 IoT client started");
+  Serial.println("[System] DHT22 DATA=GPIO15, Door switch=GPIO4 INPUT_PULLUP");
+  Serial.print("[System] Backend: ");
   Serial.println(BASE_URL);
+  Serial.print("[System] Endpoint: ");
+  Serial.println(TELEMETRY_PATH);
 
-  wifiConnect();
+  connectWiFi();
 }
 
 void loop() {
   const unsigned long now = millis();
-
-  const bool doorOpenNow = (digitalRead(DOOR_PIN) == LOW);
-
-  if (doorOpenNow && !doorOpen) {
-    doorOpen = true;
-    doorOpenedAtMs = now;
-    Serial.println("Door event: OPEN");
-  } else if (!doorOpenNow && doorOpen) {
-    doorOpen = false;
-    doorOpenAccumulatedMs += (now - doorOpenedAtMs);
-    Serial.println("Door event: CLOSED");
-  }
-
-  if (now - windowStartMs >= DOOR_PENALTY_WINDOW_MS) {
-    if (doorOpen) {
-      doorOpenAccumulatedMs += (now - doorOpenedAtMs);
-      doorOpenedAtMs = now;
-    }
-    doorOpenAccumulatedMs = 0;
-    windowStartMs = now;
-  }
-
-  if (WiFi.status() != WL_CONNECTED) {
-    wifiConnect();
-  }
-
-  if (now - lastReadMs < READ_INTERVAL_MS) {
-    delay(10);
+  if (now - lastSendMs < SEND_INTERVAL_MS) {
+    delay(20);
     return;
   }
-  lastReadMs = now;
+  lastSendMs = now;
 
-  TempAndHumidity th = dht.getTempAndHumidity();
-  const float t = th.temperature;
-  const float h = th.humidity;
-
-  if (!isValidReading(t, h)) {
-    Serial.println("DHT22 read error: invalid data (NaN/out-of-range)");
+  TelemetryData data;
+  if (!readSensors(data)) {
     return;
   }
 
-  unsigned long openMs = doorOpenAccumulatedMs;
-  if (doorOpen) openMs += (now - doorOpenedAtMs);
-  const float doorOpenSec = openMs / 1000.0f;
-
-  const float risk = computeRiskScore(t, h, doorOpenSec);
-
-  printTelemetry(t, h, doorOpenNow, risk, doorOpenSec);
-
-  int code = postTelemetryToServer(t, h, doorOpenNow);
-  if (code <= 0) {
-    Serial.println("Telemetry not sent (no WiFi/server).");
-  }
+  sendTelemetry(data);
 }

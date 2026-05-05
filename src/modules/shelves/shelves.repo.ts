@@ -18,12 +18,12 @@ export class ShelvesRepository {
       .request()
       .input("fridge_id", sql.UniqueIdentifier, fridgeId)
       .input("name", sql.NVarChar(255), dto.name)
-      .input("position_index", sql.Int, dto.position ?? null)
+      .input("position", sql.Int, dto.position ?? null)
       .query(`
-        INSERT INTO Shelves (id, fridge_id, name, position_index, created_at, updated_at, is_deleted)
-        OUTPUT INSERTED.id, INSERTED.fridge_id, INSERTED.name, INSERTED.position_index AS position,
+        INSERT INTO Shelves (id, fridge_id, name, position, created_at, updated_at, is_deleted)
+        OUTPUT INSERTED.id, INSERTED.fridge_id, INSERTED.name, INSERTED.position,
                INSERTED.created_at, INSERTED.updated_at, INSERTED.is_deleted
-        VALUES (NEWID(), @fridge_id, @name, @position_index, SYSDATETIME(), SYSDATETIME(), 0)
+        VALUES (NEWID(), @fridge_id, @name, @position, SYSDATETIME(), SYSDATETIME(), 0)
       `);
 
     return res.recordset[0];
@@ -36,7 +36,7 @@ export class ShelvesRepository {
       .request()
       .input("id", sql.UniqueIdentifier, id)
       .query(`
-        SELECT TOP 1 id, fridge_id, name, position_index AS position,
+        SELECT TOP 1 id, fridge_id, name, position,
                created_at, updated_at, is_deleted
         FROM Shelves
         WHERE id = @id AND is_deleted = 0
@@ -52,11 +52,11 @@ export class ShelvesRepository {
       .request()
       .input("fridge_id", sql.UniqueIdentifier, fridgeId)
       .query(`
-        SELECT id, fridge_id, name, position_index AS position,
+        SELECT id, fridge_id, name, position,
                created_at, updated_at, is_deleted
         FROM Shelves
         WHERE fridge_id = @fridge_id AND is_deleted = 0
-        ORDER BY position_index ASC, created_at ASC
+        ORDER BY position ASC, created_at ASC
       `);
 
     return res.recordset as ShelfRow[];
@@ -73,8 +73,8 @@ export class ShelvesRepository {
       req.input("name", sql.NVarChar(255), patch.name);
     }
     if ("position" in patch) {
-      fields.push("position_index = @position_index");
-      req.input("position_index", sql.Int, patch.position ?? null);
+      fields.push("position = @position");
+      req.input("position", sql.Int, patch.position ?? null);
     }
 
     if (fields.length === 0) {
