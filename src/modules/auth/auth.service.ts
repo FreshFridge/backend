@@ -41,16 +41,7 @@ export class AuthService {
 
     const accessToken = this.signAccessToken(user.id, user.email, user.role);
     return {
-      user: {
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name,
-        locale: user.locale,
-        timezone: user.timezone,
-        is_active: user.is_active,
-        role: user.role,
-        created_at: user.created_at,
-      },
+      user: this.toPublicUser(user),
       accessToken,
     };
   }
@@ -59,6 +50,36 @@ export class AuthService {
     const user = await this.repo.findById(userId);
     if (!user) throw new UnauthorizedError("User not found");
 
+    return this.toPublicUser(user);
+  }
+
+  async updateProfile(userId: string, dto: { full_name?: string; locale?: string; timezone?: string }) {
+    return this.repo.updateProfile(userId, dto);
+  }
+
+  async changePassword(userId: string, dto: { old_password: string; new_password: string }) {
+    const user = await this.repo.findById(userId);
+    if (!user) throw new UnauthorizedError("User not found");
+
+    const ok = await bcrypt.compare(dto.old_password, user.password_hash);
+    if (!ok) throw new UnauthorizedError("Current password is incorrect");
+
+    const passwordHash = await bcrypt.hash(dto.new_password, 10);
+    await this.repo.updatePassword(userId, passwordHash);
+
+    return { success: true };
+  }
+
+  private toPublicUser(user: {
+    id: string;
+    email: string;
+    full_name: string;
+    locale: string;
+    timezone: string;
+    is_active: boolean;
+    role: string;
+    created_at: Date | string;
+  }) {
     return {
       id: user.id,
       email: user.email,
@@ -69,10 +90,6 @@ export class AuthService {
       role: user.role,
       created_at: user.created_at,
     };
-  }
-
-  async updateProfile(userId: string, dto: { full_name: string; locale: string; timezone: string }) {
-    return this.repo.updateProfile(userId, dto);
   }
 
   private signAccessToken(id: string, email: string, role: string) {

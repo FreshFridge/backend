@@ -1,4 +1,4 @@
-import { poolPromise, sql } from "../../db/mssql";
+﻿import { poolPromise, sql } from "../../db/mssql";
 
 export type ProductRow = {
   id: string;
@@ -62,7 +62,7 @@ export class ProductsRepository {
     const pool = await poolPromise;
 
     // Динамічний WHERE (параметризовано)
-    const conditions: string[] = ["user_id = @user_id"];
+    const conditions: string[] = ["user_id = @user_id", "status <> 'removed'"];
     const req = pool.request().input("user_id", sql.UniqueIdentifier, userId);
 
     if (query.status) {
@@ -188,3 +188,4 @@ export class ProductsRepository {
     return res.recordset as ProductRow[];
   }
 }
+

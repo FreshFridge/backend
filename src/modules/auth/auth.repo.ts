@@ -62,25 +62,55 @@ export class AuthRepository {
 
   async updateProfile(
     id: string,
-    data: { full_name: string; locale: string; timezone: string },
+    data: { full_name?: string; locale?: string; timezone?: string },
   ): Promise<Pick<UserRow, "id" | "email" | "full_name" | "locale" | "timezone" | "is_active" | "role" | "created_at">> {
     const pool = await poolPromise;
-    const res = await pool
-      .request()
-      .input("id", sql.UniqueIdentifier, id)
-      .input("full_name", sql.NVarChar(255), data.full_name)
-      .input("locale", sql.NVarChar(50), data.locale)
-      .input("timezone", sql.NVarChar(50), data.timezone)
-      .query(`
-        UPDATE Users
-        SET full_name = @full_name,
-            locale = @locale,
-            timezone = @timezone,
-            updated_at = SYSDATETIME()
-        OUTPUT INSERTED.id, INSERTED.email, INSERTED.full_name, INSERTED.locale, INSERTED.timezone, INSERTED.is_active, INSERTED.role, INSERTED.created_at
-        WHERE id = @id
-      `);
+    const fields: string[] = [];
+    const request = pool.request().input("id", sql.UniqueIdentifier, id);
+
+    if (data.full_name !== undefined) {
+      fields.push("full_name = @full_name");
+      request.input("full_name", sql.NVarChar(255), data.full_name);
+    }
+
+    if (data.locale !== undefined) {
+      fields.push("locale = @locale");
+      request.input("locale", sql.NVarChar(50), data.locale);
+    }
+
+    if (data.timezone !== undefined) {
+      fields.push("timezone = @timezone");
+      request.input("timezone", sql.NVarChar(50), data.timezone);
+    }
+
+    if (fields.length === 0) {
+      const current = await this.findById(id);
+      if (!current) throw new Error("User not found");
+      return current;
+    }
+
+    const res = await request.query(`
+      UPDATE Users
+      SET ${fields.join(", ")},
+          updated_at = SYSDATETIME()
+      OUTPUT INSERTED.id, INSERTED.email, INSERTED.full_name, INSERTED.locale, INSERTED.timezone, INSERTED.is_active, INSERTED.role, INSERTED.created_at
+      WHERE id = @id
+    `);
 
     return res.recordset[0];
+  }
+
+  async updatePassword(id: string, passwordHash: string): Promise<void> {
+    const pool = await poolPromise;
+    await pool
+      .request()
+      .input("id", sql.UniqueIdentifier, id)
+      .input("password_hash", sql.NVarChar(255), passwordHash)
+      .query(`
+        UPDATE Users
+        SET password_hash = @password_hash,
+            updated_at = SYSDATETIME()
+        WHERE id = @id
+      `);
   }
 }

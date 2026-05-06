@@ -106,13 +106,23 @@ export class FridgesRepository {
       const request = new sql.Request(transaction).input("id", sql.UniqueIdentifier, id);
 
       await request.query(`
-        DELETE FROM Products
-            WHERE fridge_id = @id
-               OR shelf_id IN (SELECT id FROM Shelves WHERE fridge_id = @id);
+        UPDATE Products
+        SET status = 'removed',
+            fridge_id = NULL,
+            shelf_id = NULL
+        WHERE fridge_id = @id
+           OR shelf_id IN (SELECT id FROM Shelves WHERE fridge_id = @id);
 
         UPDATE Shelves
         SET is_deleted = 1, updated_at = SYSDATETIME()
         WHERE fridge_id = @id;
+
+        IF OBJECT_ID('IoTDevices', 'U') IS NOT NULL
+        BEGIN
+          UPDATE IoTDevices
+          SET is_active = 0, updated_at = SYSDATETIME()
+          WHERE fridge_id = @id;
+        END
 
         UPDATE Fridges
         SET is_deleted = 1, updated_at = SYSDATETIME()
@@ -145,4 +155,5 @@ export class FridgesRepository {
     return res.recordset[0].has_data === 1;
   }
 }
+
 

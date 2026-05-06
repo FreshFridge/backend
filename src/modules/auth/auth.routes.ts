@@ -1,7 +1,12 @@
-import { Router } from "express";
+﻿import { Router } from "express";
 import { authMiddleware } from "../../middleware/authMiddleware";
 import { validateBody } from "../../middleware/validateBody";
-import { registerSchema, loginSchema, updateProfileSchema } from "./auth.validation";
+import {
+  changePasswordSchema,
+  loginSchema,
+  registerSchema,
+  updateProfileSchema,
+} from "./auth.validation";
 import { AuthService } from "./auth.service";
 
 const router = Router();
@@ -17,15 +22,23 @@ router.post("/api/auth/login", validateBody(loginSchema), async (req, res) => {
   res.status(200).json(result);
 });
 
-
-
-router.get("/api/auth/me", authMiddleware, async (req, res) => {
+const getProfileHandler = async (req: any, res: any) => {
   const result = await service.getProfile(req.user!.id);
   res.json(result);
-});
+};
 
-router.patch("/api/auth/me", authMiddleware, validateBody(updateProfileSchema), async (req, res) => {
+const updateProfileHandler = async (req: any, res: any) => {
   const result = await service.updateProfile(req.user!.id, req.body);
   res.json(result);
+};
+
+router.get("/api/auth/me", authMiddleware, getProfileHandler);
+router.patch("/api/auth/me", authMiddleware, validateBody(updateProfileSchema), updateProfileHandler);
+router.get("/api/users/profile", authMiddleware, getProfileHandler);
+router.patch("/api/users/profile", authMiddleware, validateBody(updateProfileSchema), updateProfileHandler);
+router.patch("/api/users/profile/password", authMiddleware, validateBody(changePasswordSchema), async (req, res) => {
+  const result = await service.changePassword(req.user!.id, req.body);
+  res.json(result);
 });
+
 export default router;
