@@ -1,4 +1,4 @@
-import bcrypt from "bcrypt";
+﻿import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { AuthRepository } from "./auth.repo";
 import { ConflictError, UnauthorizedError } from "../../utils/errors";
@@ -53,6 +53,26 @@ export class AuthService {
       },
       accessToken,
     };
+  }
+
+  async getProfile(userId: string) {
+    const user = await this.repo.findById(userId);
+    if (!user) throw new UnauthorizedError("User not found");
+
+    return {
+      id: user.id,
+      email: user.email,
+      full_name: user.full_name,
+      locale: user.locale,
+      timezone: user.timezone,
+      is_active: user.is_active,
+      role: user.role,
+      created_at: user.created_at,
+    };
+  }
+
+  async updateProfile(userId: string, dto: { full_name: string; locale: string; timezone: string }) {
+    return this.repo.updateProfile(userId, dto);
   }
 
   private signAccessToken(id: string, email: string, role: string) {

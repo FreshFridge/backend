@@ -1,4 +1,4 @@
-import { poolPromise, sql } from "../../db/mssql";
+﻿import { poolPromise, sql } from "../../db/mssql";
 
 export type UserRow = {
   id: string;
@@ -25,6 +25,16 @@ export class AuthRepository {
     return (res.recordset[0] as UserRow) ?? null;
   }
 
+  async findById(id: string): Promise<UserRow | null> {
+    const pool = await poolPromise;
+    const res = await pool
+      .request()
+      .input("id", sql.UniqueIdentifier, id)
+      .query("SELECT TOP 1 * FROM Users WHERE id = @id");
+
+    return (res.recordset[0] as UserRow) ?? null;
+  }
+
   async createUser(data: {
     email: string;
     password_hash: string;
@@ -45,6 +55,30 @@ export class AuthRepository {
         INSERT INTO Users (id, email, password_hash, full_name, locale, timezone, is_active, created_at)
         OUTPUT INSERTED.id, INSERTED.email, INSERTED.full_name, INSERTED.locale, INSERTED.timezone, INSERTED.is_active, INSERTED.created_at
         VALUES (NEWID(), @email, @password_hash, @full_name, @locale, @timezone, 1, SYSDATETIME())
+      `);
+
+    return res.recordset[0];
+  }
+
+  async updateProfile(
+    id: string,
+    data: { full_name: string; locale: string; timezone: string },
+  ): Promise<Pick<UserRow, "id" | "email" | "full_name" | "locale" | "timezone" | "is_active" | "role" | "created_at">> {
+    const pool = await poolPromise;
+    const res = await pool
+      .request()
+      .input("id", sql.UniqueIdentifier, id)
+      .input("full_name", sql.NVarChar(255), data.full_name)
+      .input("locale", sql.NVarChar(50), data.locale)
+      .input("timezone", sql.NVarChar(50), data.timezone)
+      .query(`
+        UPDATE Users
+        SET full_name = @full_name,
+            locale = @locale,
+            timezone = @timezone,
+            updated_at = SYSDATETIME()
+        OUTPUT INSERTED.id, INSERTED.email, INSERTED.full_name, INSERTED.locale, INSERTED.timezone, INSERTED.is_active, INSERTED.role, INSERTED.created_at
+        WHERE id = @id
       `);
 
     return res.recordset[0];

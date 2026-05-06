@@ -14,7 +14,7 @@ static const char* WIFI_SSID = "Wokwi-GUEST";
 static const char* WIFI_PASS = "";
 
 static const char* BASE_URL = "https://accordingly-terrorists-justice-portions.trycloudflare.com";
-static const char* AUTH_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjMzQzEzQTEzLTY5QjgtNDA0RC1CMEQyLUY2RjNDMkYxQzE5RSIsImVtYWlsIjoiYW5uYUB0ZXN0LmNvbSIsInJvbGUiOiJ1c2VyIiwiaWF0IjoxNzY2NDEwOTU2LCJleHAiOjE3NjY0MTE4NTZ9.UFpAV1udR6SvwxnF43LhCQl2OL1LApQs_ihKCWS75tE";
+static const char* IOT_API_KEY = "PASTE_IOT_API_KEY_HERE";
 static const char* TELEMETRY_PATH = "/api/iot/telemetry";
 
 static const char* FRIDGE_ID = "AD5501E3-6EFB-4AF6-88B7-C2363EE753C7";
@@ -131,7 +131,7 @@ static int postTelemetryOnce(const String& url, const String& body) {
   http.setTimeout(HTTP_TIMEOUT_MS);
   http.setFollowRedirects(HTTPC_STRICT_FOLLOW_REDIRECTS);
   http.addHeader("Content-Type", "application/json");
-  http.addHeader("Authorization", String("Bearer ") + AUTH_TOKEN);
+  http.addHeader("x-api-key", IOT_API_KEY);
 
   Serial.print("[HTTP] POST ");
   Serial.println(url);

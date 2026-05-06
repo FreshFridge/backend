@@ -12,3 +12,8 @@ export const loginSchema = z.object({
   email: z.string().email(),
   password: z.string().min(6).max(128),
 });
+export const updateProfileSchema = z.object({
+  full_name: z.string().min(2).max(255),
+  locale: z.string().min(2).max(50),
+  timezone: z.string().min(2).max(50),
+});

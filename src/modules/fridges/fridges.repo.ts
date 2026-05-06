@@ -1,4 +1,4 @@
-import { poolPromise, sql } from "../../db/mssql";
+﻿import { poolPromise, sql } from "../../db/mssql";
 
 export type FridgeRow = {
   id: string;
@@ -96,6 +96,36 @@ export class FridgesRepository {
       .query("UPDATE Fridges SET is_deleted = 1, updated_at = SYSDATETIME() WHERE id = @id");
   }
 
+  async softDeleteWithContents(id: string): Promise<void> {
+    const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
+
+    await transaction.begin();
+
+    try {
+      const request = new sql.Request(transaction).input("id", sql.UniqueIdentifier, id);
+
+      await request.query(`
+        DELETE FROM Products
+            WHERE fridge_id = @id
+               OR shelf_id IN (SELECT id FROM Shelves WHERE fridge_id = @id);
+
+        UPDATE Shelves
+        SET is_deleted = 1, updated_at = SYSDATETIME()
+        WHERE fridge_id = @id;
+
+        UPDATE Fridges
+        SET is_deleted = 1, updated_at = SYSDATETIME()
+        WHERE id = @id;
+      `);
+
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+
   async hasShelvesOrProducts(fridgeId: string): Promise<boolean> {
     const pool = await poolPromise;
 
@@ -115,3 +145,4 @@ export class FridgesRepository {
     return res.recordset[0].has_data === 1;
   }
 }
+

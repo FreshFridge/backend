@@ -1,4 +1,4 @@
-import { ConflictError, ForbiddenError, NotFoundError } from "../../utils/errors";
+import { ForbiddenError, NotFoundError } from "../../utils/errors";
 import { FridgesRepository } from "../fridges/fridges.repo";
 import { ShelvesRepository } from "./shelves.repo";
 
@@ -40,12 +40,6 @@ export class ShelvesService {
 
   async remove(userId: string, id: string) {
     await this.getById(userId, id);
-
-    const hasProducts = await this.repo.hasProducts(id);
-    if (hasProducts) {
-      throw new ConflictError("Cannot delete shelf: it contains products");
-    }
-
-    await this.repo.softDelete(id);
+    await this.repo.softDeleteAndDetachProducts(id);
   }
 }

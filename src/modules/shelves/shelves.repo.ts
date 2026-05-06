@@ -103,6 +103,32 @@ export class ShelvesRepository {
       .query("UPDATE Shelves SET is_deleted = 1, updated_at = SYSDATETIME() WHERE id = @id");
   }
 
+  async softDeleteAndDetachProducts(id: string): Promise<void> {
+    const pool = await poolPromise;
+    const transaction = new sql.Transaction(pool);
+
+    await transaction.begin();
+
+    try {
+      const request = new sql.Request(transaction).input("id", sql.UniqueIdentifier, id);
+
+      await request.query(`
+        UPDATE Products
+        SET shelf_id = NULL
+        WHERE shelf_id = @id;
+
+        UPDATE Shelves
+        SET is_deleted = 1, updated_at = SYSDATETIME()
+        WHERE id = @id;
+      `);
+
+      await transaction.commit();
+    } catch (error) {
+      await transaction.rollback();
+      throw error;
+    }
+  }
+
   async hasProducts(shelfId: string): Promise<boolean> {
     const pool = await poolPromise;
 

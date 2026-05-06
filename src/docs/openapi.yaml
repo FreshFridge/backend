@@ -29,6 +29,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
 
   schemas:
     Error:
@@ -466,6 +470,56 @@ components:
           type: string
           format: date-time
 
+    IotDeviceCreateRequest:
+      type: object
+      required: [fridgeId]
+      properties:
+        fridgeId:
+          type: string
+          format: uuid
+          example: AD5501E3-6EFB-4AF6-88B7-C2363EE753C7
+        name:
+          type: string
+          example: Kitchen ESP32
+
+    IotDeviceResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        userId:
+          type: string
+          format: uuid
+        fridgeId:
+          type: string
+          format: uuid
+        name:
+          type: string
+        apiKeyPrefix:
+          type: string
+        isActive:
+          type: boolean
+        lastUsedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    IotDeviceCreateResponse:
+      allOf:
+        - $ref: '#/components/schemas/IotDeviceResponse'
+        - type: object
+          properties:
+            apiKey:
+              type: string
+              description: Plain API key. It is returned only once and is not stored in plain text.
+              example: ff_iot_0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     # Admin schemas
     AdminUser:
       type: object
@@ -1348,13 +1402,61 @@ paths:
         "401":
           description: Unauthorized
 
+  # IoT device endpoints
+  /api/iot/devices:
+    get:
+      tags: [IoT]
+      summary: List IoT devices for current user
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: IoT devices retrieved
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/IotDeviceResponse'
+        "401":
+          description: Unauthorized
+
+    post:
+      tags: [IoT]
+      summary: Create IoT device API key
+      description: Creates an IoT device linked to a fridge and returns the plain API key once. Store it in the ESP32 sketch as IOT_API_KEY.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IotDeviceCreateRequest'
+      responses:
+        "201":
+          description: IoT device created. The apiKey is shown only once.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IotDeviceCreateResponse'
+        "401":
+          description: Unauthorized
+        "403":
+          description: Fridge does not belong to user
+        "404":
+          description: Fridge not found
   # IoT Telemetry endpoints
   /api/iot/telemetry:
     post:
       tags: [IoT]
       summary: Ingest telemetry data from fridge
-      description: Accept telemetry data from IoT fridge, analyze against thresholds, and create notifications on violations
+      description: |
+        Accept telemetry data from an IoT fridge. ESP32 devices should authenticate with the x-api-key header.
+        Bearer JWT is kept for Swagger/manual tests.
+        Example body: { "fridgeId": "AD5501E3-6EFB-4AF6-88B7-C2363EE753C7", "temperature": 4.5, "humidity": 65.2, "doorOpen": false }
       security:
+        - ApiKeyAuth: []
         - BearerAuth: []
       requestBody:
         required: true
