@@ -16,11 +16,19 @@ import adminRoutes from "./modules/admin/admin.routes";
 import swaggerUi from "swagger-ui-express";
 import YAML from "yaml";
 import fs from "fs";
+import os from "os";
 import path from "path";
 
 dotenv.config();
 
 export const app = express();
+const instanceId = process.env.INSTANCE_ID || process.env.HOSTNAME || os.hostname();
+
+app.use((req, res, next) => {
+  res.setHeader("X-Backend-Instance", instanceId);
+  next();
+});
+
 app.use(express.json());
 app.use(normalizeBody);
 app.use(responseFormatter);
@@ -34,7 +42,16 @@ const openapiDocument = YAML.parse(openapiFile);
 app.use("/docs", swaggerUi.serve, swaggerUi.setup(openapiDocument));
 
 app.get("/health", (req, res) => {
-  res.json({ status: "ok", service: "FreshFridge API" });
+  const health = {
+    status: "ok",
+    instanceId,
+    hostname: os.hostname(),
+    uptime: Number(process.uptime().toFixed(2)),
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || "development",
+  };
+
+  res.type("application/json").send(`${JSON.stringify(health, null, 2)}\n`);
 });
 
 app.get("/", (req, res) => {

@@ -7,6 +7,9 @@ const port = Number(process.env.PORT ?? 3000);
 app.listen(port, () => {
   logger.info("FreshFridge API running", { port });
 
-  // Start background jobs
-  startScheduler();
+  if (process.env.RUN_SCHEDULER !== "false") {
+    startScheduler();
+  } else {
+    logger.info("Freshness scheduler disabled for this instance");
+  }
 });

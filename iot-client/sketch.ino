@@ -13,7 +13,7 @@ static const int SERIAL_BAUD = 115200;
 static const char* WIFI_SSID = "Wokwi-GUEST";
 static const char* WIFI_PASS = "";
 
-static const char* BASE_URL = "https://accordingly-terrorists-justice-portions.trycloudflare.com";
+static const char* BASE_URL = "https://YOUR_LOAD_BALANCER_HOST";
 static const char* IOT_API_KEY = "PASTE_IOT_API_KEY_HERE";
 static const char* TELEMETRY_PATH = "/api/iot/telemetry";
 

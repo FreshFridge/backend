@@ -17,6 +17,7 @@ services:
   app:
     image: ${APP_IMAGE}
     restart: unless-stopped
+    command: sh -c "npm run db:init && npm run start"
     env_file:
       - .env
     environment:
