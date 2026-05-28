@@ -33,6 +33,14 @@ flowchart LR
 
 Create `.env` from `.env.example` and set `SA_PASSWORD`, `JWT_ACCESS_SECRET`, and optionally `LB_PORT`.
 
+The database init step also ensures an admin account exists. Override these in `.env` for production:
+
+```env
+ADMIN_EMAIL=admin@freshfridge.com
+ADMIN_PASSWORD=Admin123!
+ADMIN_NAME=Administrator
+```
+
 Start 3 backend replicas:
 
 ```bash

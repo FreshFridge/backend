@@ -1,5 +1,9 @@
 import sql from "mssql";
+import dotenv from "dotenv";
+import { seedAdminUser } from "./seedAdmin";
 import { logger } from "./../utils/logger";
+
+dotenv.config();
 
 const database = process.env.DB_DATABASE ?? "FreshFridgeDB";
 const retries = Number(process.env.DB_CONNECT_RETRIES ?? 30);
@@ -261,6 +265,8 @@ async function run(): Promise<void> {
       VALUES (2, 24, 1);
     END
   `);
+
+  await seedAdminUser(pool);
 
   const seedUserId = process.env.IOT_USER_ID ?? "11111111-1111-4111-8111-111111111111";
   const seedFridgeId = process.env.IOT_FRIDGE_ID ?? "22222222-2222-4222-8222-222222222222";
